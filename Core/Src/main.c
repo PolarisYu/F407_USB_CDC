@@ -19,11 +19,16 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usart.h"
+#include "usb_otg.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "SEGGER_RTT.h"
+#include "usbd_cdc_acm.h"
+#include "cdc_acm_ringbuffer.h"
+#include <string.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,10 +64,19 @@ void SystemClock_Config(void);
 /*
 * @brief USB Log (Retargets the C library printf function to the USART)
 */
-int _write(int fd, char *ptr, int len) {
+#if defined(__CC_ARM)      // Keil
+int fputc(int ch,FILE *f)
+{
   SEGGER_RTT_Write(0, ptr, len);
   return len;
 }
+#elif defined(__GNUC__)   // GCC
+int _write(int fd, char *ptr, int len)  
+{  
+  SEGGER_RTT_Write(0, ptr, len);
+  return len;
+}
+#endif
 
 /* USER CODE END 0 */
 
@@ -95,12 +109,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USB_OTG_FS_PCD_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   // USB Device CDC Init
-  extern void cdc_acm_init(uint8_t busid, uint32_t reg_base);
-  cdc_acm_init(0, USB_OTG_FS_PERIPH_BASE);
+  uint8_t busid = 0;
+  // extern void cdc_acm_init(uint8_t busid, uint32_t reg_base);
+  cdc_acm_init(busid, USB_OTG_FS_PERIPH_BASE);
   HAL_Delay(100);
 
   /* USER CODE END 2 */
@@ -112,7 +128,30 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    if (!cdc_acm_is_rx_empty())
+    {
+        uint8_t rx_buf[128];
+        int len = cdc_acm_read_data(rx_buf, sizeof(rx_buf));
 
+        if (len > 0)
+        {
+            // 回显接收到的数据
+            cdc_acm_send_data(busid, rx_buf, len);
+        }
+    }
+
+    // 定期发送心跳
+    static uint32_t tick = 0;
+    if (++tick % 10000 == 0)
+    {
+        const char *msg = "Heartbeat\r\n";
+        cdc_acm_send_data(busid, (uint8_t *)msg, strlen(msg));
+    }
+
+    // 重要：触发发送
+    cdc_acm_try_send(busid);
+
+    HAL_Delay(1);
   }
   /* USER CODE END 3 */
 }
@@ -180,8 +219,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
