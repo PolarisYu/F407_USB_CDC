@@ -18,15 +18,20 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "tim.h"
 #include "usart.h"
 #include "usb_otg.h"
 #include "gpio.h"
+#include "fsmc.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "SEGGER_RTT.h"
 #include "usbd_cdc_acm.h"
+#include "usb_log.h"
 #include "cdc_acm_ringbuffer.h"
+#include "lcd_logic.h"
+// #include "touch.h"
 #include <string.h>
 
 /* USER CODE END Includes */
@@ -75,6 +80,7 @@ int _write(int fd, char *ptr, int len)
 {  
   SEGGER_RTT_Write(0, ptr, len);
   return len;
+  // HAL_Delay();
 }
 #endif
 
@@ -111,14 +117,20 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_USART1_UART_Init();
+  MX_FSMC_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   // USB Device CDC Init
+  LCD_Init();
   uint8_t busid = 0;
   // extern void cdc_acm_init(uint8_t busid, uint32_t reg_base);
   cdc_acm_init(busid, USB_OTG_FS_PERIPH_BASE);
   HAL_Delay(100);
-
+  LCD_Fill(0, 0, 100, 100, RED); 
+  LCD_ShowString(120, 10, 200, 16, 16, "Hello");
+  LCD_ShowString(120, 40, 200, 16, 16, (uint8_t*)"Hello STM32!");
+  // LCD_DrawCircle(120, 160, 50);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -130,14 +142,15 @@ int main(void)
     /* USER CODE BEGIN 3 */
     if (!cdc_acm_is_rx_empty())
     {
-        uint8_t rx_buf[128];
-        int len = cdc_acm_read_data(rx_buf, sizeof(rx_buf));
+      uint8_t rx_buf[128];
+      int len = cdc_acm_read_data(rx_buf, sizeof(rx_buf));
 
-        if (len > 0)
-        {
-            // 回显接收到的数据
-            cdc_acm_send_data(busid, rx_buf, len);
-        }
+      if (len > 0)
+      {
+        // 回显接收到的数据
+        cdc_acm_send_data(busid, rx_buf, len);
+        LCD_ShowString(5, 120, 400, 16, 16, rx_buf);
+      }
     }
 
     // 定期发送心跳
@@ -146,6 +159,7 @@ int main(void)
     {
         const char *msg = "Heartbeat\r\n";
         cdc_acm_send_data(busid, (uint8_t *)msg, strlen(msg));
+        USB_LOG_INFO("Heartbeat");
     }
 
     // 重要：触发发送

@@ -23,7 +23,6 @@ targets:
       defineList:
         - USE_HAL_DRIVER
         - STM32F407xx
-        - CONFIG_USB_FS
       incList:
         - Core/Inc
         - Drivers/CMSIS/Include
@@ -36,6 +35,7 @@ targets:
         - CherryUSB/port/dwc2
         - Drivers/CMSIS/Device/ST/STM32F4xx/Include
         - SeggerRTT
+        - Drivers/LCD
       libList: []
     excludeList: []
     toolchain: GCC
@@ -54,7 +54,7 @@ targets:
             language-cpp: c++11
             one-elf-section-per-data: true
             one-elf-section-per-function: true
-            optimization: level-2
+            optimization: level-debug
             warnings: all-warnings
           global:
             $float-abi-type: hard
@@ -94,4 +94,4 @@ targets:
         resetMode: default
         runAfterProgram: true
         speed: 4000
-    uploader: STLink
+    uploader: JLink

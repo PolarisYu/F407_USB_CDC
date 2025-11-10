@@ -321,6 +321,7 @@ int cdc_acm_send_data(uint8_t busid, const uint8_t *data, uint32_t len)
     // 立即尝试发送
     cdc_acm_try_send(busid);
     
+    USB_LOG_INFO("Written %d bytes\r\n", written);
     return (int)written;
 }
 
@@ -330,7 +331,10 @@ int cdc_acm_read_data(uint8_t *buffer, uint32_t max_len)
     if (buffer == NULL || max_len == 0) {
         return 0;
     }
-    
+
+    uint32_t used = chry_ringbuffer_get_used(&rx_ringbuf);
+    USB_LOG_INFO("Read %d bytes\r\n", used);
+
     return (int)chry_ringbuffer_read(&rx_ringbuf, buffer, max_len);
 }
 
