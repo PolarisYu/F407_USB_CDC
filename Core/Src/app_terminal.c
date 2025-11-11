@@ -5,40 +5,40 @@
 
 
 // --- 屏幕尺寸 (从 lcddev 获取, 但可用于静态数组) ---
-#define SCREEN_WIDTH        800
-#define SCREEN_HEIGHT       480
+#define SCREEN_WIDTH            800
+#define SCREEN_HEIGHT           480
 
 // --- 颜色定义 ---
-#define COLOR_BG            WHITE       // 背景色 (画纸)
-#define COLOR_LOG_BG        LGRAY       // 日志区域背景
-#define COLOR_LOG           BLACK       // 日志文字
-#define COLOR_LOG_TEXT      YELLOW       // 日志文字
-#define COLOR_KEY_BG        DARKBLUE    // 按键背景
-#define COLOR_KEY_TEXT      WHITE       // 按键文字
-#define COLOR_KEY_SPECIAL   RED         // 特殊按键 (Send/Clear)
-#define COLOR_KEY_PRESSED   GREEN       // 按键按下
-#define COLOR_BORDER        BLACK       // 边框
-#define COLOR_TITLE         WHITE       // 标题文字
+#define COLOR_BG                WHITE       // 背景色 (画纸)
+#define COLOR_LOG_BG            LGRAY       // 日志区域背景
+#define COLOR_LOG               BLACK       // 日志文字
+#define COLOR_LOG_TEXT          YELLOW       // 日志文字
+#define COLOR_KEY_BG            DARKBLUE    // 按键背景
+#define COLOR_KEY_TEXT          WHITE       // 按键文字
+#define COLOR_KEY_SPECIAL       RED         // 特殊按键 (Send/Clear)
+#define COLOR_KEY_PRESSED       GREEN       // 按键按下
+#define COLOR_BORDER            BLACK       // 边框
+#define COLOR_TITLE             WHITE       // 标题文字
 
 // --- 区域定义 ---
-#define ZONE_TITLE_H        30         // 顶部标题栏高度
-#define ZONE_RX_LOG_Y       ZONE_TITLE_H  // 接收日志Y坐标
-#define ZONE_RX_LOG_H       120        // 接收日志高度
-#define ZONE_TX_LOG_Y       (ZONE_RX_LOG_Y + ZONE_RX_LOG_H + 5) // 发送日志Y坐标 (155)
-#define ZONE_TX_LOG_H       120        // 发送日志高度
-#define ZONE_KEYBOARD_Y     (ZONE_TX_LOG_Y + ZONE_TX_LOG_H + 5) // 键盘Y坐标 (280)
-#define ZONE_KEYBOARD_H     (SCREEN_HEIGHT - ZONE_KEYBOARD_Y)   // 键盘高度 (200)
+#define ZONE_TITLE_H            30         // 顶部标题栏高度
+#define ZONE_RX_LOG_Y           ZONE_TITLE_H  // 接收日志Y坐标
+#define ZONE_RX_LOG_H           120        // 接收日志高度
+#define ZONE_TX_LOG_Y           (ZONE_RX_LOG_Y + ZONE_RX_LOG_H + 5) // 发送日志Y坐标 (155)
+#define ZONE_TX_LOG_H           120        // 发送日志高度
+#define ZONE_KEYBOARD_Y         (ZONE_TX_LOG_Y + ZONE_TX_LOG_H + 5) // 键盘Y坐标 (280)
+#define ZONE_KEYBOARD_H         (SCREEN_HEIGHT - ZONE_KEYBOARD_Y)   // 键盘高度 (200)
 
-#define KEYBOARD_INPUT_Y    (ZONE_KEYBOARD_Y + 5) // 键盘输入框Y
-#define KEYBOARD_GRID_Y     (KEYBOARD_INPUT_Y + 25) // 键盘按键Y
+#define KEYBOARD_INPUT_Y        (ZONE_KEYBOARD_Y + 5) // 键盘输入框Y
+#define KEYBOARD_GRID_Y         (KEYBOARD_INPUT_Y + 25) // 键盘按键Y
 
 // --- 存储和日志定义 ---
-#define MAX_LOG_LINES       6       // 日志区显示行数 (RX 和 TX 各自)
-#define MAX_LOG_WIDTH       98      // 日志每行最大字符数
-#define MAX_STORAGE_SLOTS   4       // 数据存储槽数量
-#define MAX_STORAGE_WIDTH   100     // 存储槽最大字符数
-#define MAX_KEY_BUFFER_LEN  90      // 键盘输入框最大长度
-#define MAX_CHUNK_BUFFER_LEN 256    // 长数据重组缓冲区长度
+#define MAX_LOG_LINES           6       // 日志区显示行数 (RX 和 TX 各自)
+#define MAX_LOG_WIDTH           98      // 日志每行最大字符数
+#define MAX_STORAGE_SLOTS       4       // 数据存储槽数量
+#define MAX_STORAGE_WIDTH       100     // 存储槽最大字符数
+#define MAX_KEY_BUFFER_LEN      90      // 键盘输入框最大长度
+#define MAX_CHUNK_BUFFER_LEN    256    // 长数据重组缓冲区长度
 
 // --- 触控按键结构体 ---
 typedef struct {
@@ -685,8 +685,11 @@ static void handle_key_press(TouchKey_t* key)
     }
     // --- 4. 存储键 ---
     else if (strcmp(key->label, "Store TX") == 0) {
-        if(keyboard_buffer_idx > 0) {
-            add_to_storage(false, keyboard_buffer);
+        // [正确逻辑] 存储滚动日志的最后一行 (即数组的最后一条)
+        int last_line_index = MAX_LOG_LINES - 1;
+        
+        if(tx_log_lines[last_line_index][0] != '\0') {
+            add_to_storage(false, tx_log_lines[last_line_index]);
         }
     }
     else if (strcmp(key->label, "Store RX") == 0) {
@@ -802,7 +805,7 @@ static void process_received_data(uint8_t* data, uint32_t len)
     // --- 基本功能: 显示和存储 (Req 2, 4) ---
     else {
         add_to_log(true, str_data);
-        add_to_storage(true, str_data);
+        // add_to_storage(true, str_data);
     }
 }
 
@@ -921,6 +924,9 @@ static void send_chunked_data(void)
     int data_len = strlen(long_data);
     char chunk[9]; // 8 字节 + null
     chunk[8] = '\0'; 
+
+    // 自动将完整的长数据存入TX存储
+    add_to_storage(false, long_data);
     
     add_to_log(false, "[Chunked] SEND START.");
     cdc_acm_send_data(g_busid, (uint8_t*)"START", 5);
